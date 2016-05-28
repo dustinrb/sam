@@ -698,7 +698,6 @@ class Annotation:
         self.text = text
         self.specifically = specifically
         self.namespace = namespace
-        self.language = language
 
     def __str__(self):
         return '{%s}(%s "%s" (%s))' % (self.text, self.annotation_type, self.specifically, self.namespace)
@@ -711,8 +710,6 @@ class Annotation:
             yield ' specifically="{0}"'.format(escape_for_xml(self.specifically))
         if self.namespace:
             yield ' namespace="{0}"'.format(self.namespace)
-        if self.language:
-            yield ' xml:lang="{0}"'.format(self.language)
         yield '>{0}</annotation>'.format(escape_for_xml(self.text))
 
 
@@ -1003,7 +1000,7 @@ class SamParaParser:
             'escape': re.compile(r'\\', re.U),
             'escaped-chars': re.compile('[\\\(\{\}\[\]_\*,\.\*`"&' + "']", re.U),
             'annotation': re.compile(
-                r'(?<!\\)\{(?P<text>.*?)(?<!\\)\}(\(\s*(?P<type>\S*?\s*[^\\"\']?)(["\'](?P<specifically>.*?)["\'])??\s*(\((?P<namespace>\w+)\))?\s*(!(?P<language>[\w-]+))?\))?', re.U),
+                r'(?<!\\)\{(?P<text>([^\{]|\\\{)*?)(?<!\\)\}(\((\s*((?P<type>[?!]?[\S,]*?\s*[^\\"\']?)(["\'](?P<specifically>.*?)["\'])??\s*(\((?P<namespace>\w+)\))?)[,\)])+)', re.U),
             'bold': re.compile(r'\*(?P<text>((?<=\\)\*|[^\*])*)(?<!\\)\*', re.U),
             'italic': re.compile(r'_(?P<text>((?<=\\)_|[^_])*)(?<!\\)_', re.U),
             'code': re.compile(r'`(?P<text>(``|[^`])*)`', re.U),
@@ -1071,13 +1068,12 @@ class SamParaParser:
             self.flow.append(self.current_string)
             self.current_string = ''
             annotation_type = match.group('type')
-            language = match.group('language')
             text = self._unescape(match.group("text"))
 
             # If there is an annotated phrase with no annotation, look back
             # to see if it has been annotated already, and if so, copy the
             # closest preceding annotation.
-            if annotation_type is None and not language:
+            if annotation_type is None:
                 # First look back in the current flow
                 # (which is not part of the doc structure yet).
                 previous = self.flow.find_last_annotation(text)
@@ -1108,7 +1104,7 @@ class SamParaParser:
                 else:
                     specifically = match.group('specifically') if match.group('specifically') is not None else None
                 namespace = match.group('namespace').strip() if match.group('namespace') is not None else None
-                self.flow.append(Annotation(annotation_type, text, specifically, namespace, language))
+                self.flow.append(Annotation(annotation_type, text, specifically, namespace))
             para.advance(len(match.group(0)) - 1)
             return "PARA", para
         else:
